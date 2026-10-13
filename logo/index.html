@@ -60,6 +60,34 @@
     <div class="row dl"></div>
   </section>
 
+  <section data-mark="sliced">
+    <div class="label"><h2>01B · Sliced</h2><span>Same stacked block, but CHAOS is cut into strips that slide sideways, like a glitch or a skipping record.</span></div>
+    <div class="hero"><canvas></canvas></div>
+    <div class="flats"></div>
+    <div class="row dl"></div>
+  </section>
+
+  <section data-mark="oneline">
+    <div class="label"><h2>01C · One line</h2><span>HOUSE ✷ CHAOS. A chaos star replaces “OF”. Made for banners, headers and the bottom of flyers.</span></div>
+    <div class="hero"><canvas></canvas></div>
+    <div class="flats"></div>
+    <div class="row dl"></div>
+  </section>
+
+  <section data-mark="tower">
+    <div class="label"><h2>01D · Tower</h2><span>Tall condensed poster type with “OF” running vertically and CHAOS tumbling. Strong on stories and posters.</span></div>
+    <div class="hero"><canvas></canvas></div>
+    <div class="flats"></div>
+    <div class="row dl"></div>
+  </section>
+
+  <section data-mark="monogram">
+    <div class="label"><h2>01E · Monogram</h2><span>H ✷ C with the full name underneath. Compact enough for a profile picture, stamp or merch chest print.</span></div>
+    <div class="hero"><canvas></canvas></div>
+    <div class="flats"></div>
+    <div class="row dl"></div>
+  </section>
+
   <section data-mark="seal">
     <div class="label"><h2>02 · Seal</h2><span>Label stamp with an eight-arrow chaos star. Works as a profile picture, vinyl centre label or wristband.</span></div>
     <div class="hero"><canvas></canvas></div>
@@ -80,7 +108,7 @@
 (() => {
 const params = new URLSearchParams(location.search);
 if (params.get("export") === "1") document.body.classList.add("export");
-const MARKS = ["wordmark", "seal", "liquid"];
+const MARKS = ["wordmark", "sliced", "oneline", "tower", "monogram", "seal", "liquid"];
 let finish = "silver";
 
 const loadImg = src => new Promise((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = src; });
@@ -178,7 +206,7 @@ async function drawAll(){
   for (const name of MARKS){
     const sec = document.querySelector(`[data-mark="${name}"]`), cv = sec.querySelector(".hero canvas");
     const r = await renderMark(name, name === "seal" ? 900 : 1400);
-    cv.width = r.width; cv.height = r.height; cv.style.width = (name === "seal" ? 520 : 900) + "px";
+    cv.width = r.width; cv.height = r.height; cv.style.width = ({ seal: 520, tower: 640, monogram: 760 }[name] || 900) + "px";
     cv.getContext("2d").drawImage(r, 0, 0);
   }
 }
