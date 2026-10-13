@@ -8,13 +8,13 @@ An Instagram story at 1080×1920, built on the reference clip (`Andras1080.mp4`)
 |---|---|
 | `index.html` | Live preview. Switch variants, edit date and location, toggle the IG safe-zone overlay, export a PNG, record a 6 s WebM |
 | `export/kivel-talalkozunk-{a,b,c,d}.png` | Stills at 1080×1920 |
-| `export/kivel-talalkozunk-{a,b,c,d}-loop.mp4` | 6 s seamless loops, 30 fps, H.264 |
+| `export/kivel-talalkozunk-{a,b,c,d}-loop.mp4` | Videos at 30 fps, H.264: 6 s seamless loops (A–C), 8 s reveal (D) |
 | `fonts/` | Merriweather Bold and Black, Space Mono (SIL OFL), bundled so the page renders offline |
 | `tools/render.mjs` | Headless re-export of the PNGs and MP4s |
 
 ## Variants
 
-- **D · Minimál (default)**: the most minimal. Mostly black, stretched crimson type that moves letter by letter, a reserved space for the IG **poll sticker** ("SZAVAZZ ↓" plus corner brackets), and the liquid silk only as a thin floor at the bottom. Animation (6 s loop): the letters stagger in with a stretch and blur, breathe, glitch on one strobe hit at about 3.1 s, then lift out; a red ghost trail follows the motion.
+- **D · Minimál (default)**: the most minimal. Mostly black, a reserved space for the IG **poll sticker** ("SZAVAZZ ↓" plus corner brackets), and the liquid silk only as a thin floor at the bottom. The video runs 8 s: a red light line cuts the black, then every letter falls in as a beam of light in random order, scrambles through random letters and snaps to crimson with a white flash. A strobe hit splits the type red/cyan, the poll brackets draw in, and the date and location decode in. The type then holds and breathes before lifting out and fading to black, so a replay starts clean.
 - **A · Vörös selyem**: closest to the reference. Full-bleed liquid silk, a big stacked crimson headline (`KIVEL / TALÁL- / KOZUNK?`), a thin crescent moon, fog rolling in low, and a web in the lower-right corner. Animation: slow glow pulse, two short type flickers, drifting fog.
 - **B · Strobe**: club minimal. Black negative space, one horizontal tear of chrome, and tall stretched chrome type with red/white strobe ghosting. Animation: a double strobe hit, then a single one.
 - **C · Telihold**: a full moon made of the liquid chrome, a fog bank across it, and blurred crimson type underneath. Animation: breathing blur and ember glow.

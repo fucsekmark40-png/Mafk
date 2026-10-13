@@ -29,7 +29,8 @@ for (const v of list.split(',')) {
     console.log(v, 'still', Date.now() - t0, 'ms');
   } else {
     const dir = path.join(out, `_frames_${v}`); rmSync(dir, { recursive: true, force: true }); mkdirSync(dir);
-    for (let f = 0; f < 180; f++) {
+    const NF = await page.evaluate(v => window.framesOf(v), v);
+    for (let f = 0; f < NF; f++) {
       save(path.join(dir, `${String(f).padStart(4,'0')}.png`), await page.evaluate(([v, f]) => window.renderFrame(v, f), [v, f]));
       if (f % 30 === 0) console.log(v, 'frame', f);
     }
