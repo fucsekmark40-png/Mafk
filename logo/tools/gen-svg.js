@@ -25,28 +25,29 @@ function svg(w, h, body, fill) {
 }
 
 /* 1 — Wordmark: HOUSE in order, CHAOS falling apart, "OF" between two rules */
-function wordmark() {
+function wordmark(o = {}) {
   const W = 2000, size = 400;
   const top = line(archivo, 'HOUSE', size, -8), bot = line(archivo, 'CHAOS', size, -8);
   const s1 = W / top.width, s2 = W / bot.width;
   const cap = 0.72 * size; // approx cap height of Archivo
   let body = `<g transform="translate(${f2(-top.minX * s1)} ${f2(cap * s1)}) scale(${f2(s1)})"><path d="${top.glyphs.map(g => g.d).join('')}"/></g>`;
-  const ofY = cap * s1 + 70;
-  const of = line(archivo, 'OF', 90, 6);
+  const ofS = o.ofSize || 90, kk = ofS / 90;
+  const ofY = cap * s1 + 70 + (o.gapTop || 0);
+  const of = line(archivo, 'OF', ofS, 6);
   const ofX = W / 2 - of.width / 2 - of.minX;
-  body += `<g transform="translate(${f2(ofX)} ${f2(ofY + 65)})"><path d="${of.glyphs.map(g => g.d).join('')}"/></g>`;
-  const ruleY = ofY + 32, gap = 40;
+  body += `<g transform="translate(${f2(ofX)} ${f2(ofY + 65 * kk)})"><path d="${of.glyphs.map(g => g.d).join('')}"/></g>`;
+  const ruleY = ofY + 32 * kk - 6 * (kk - 1), gap = 40 * kk;
   body += `<rect x="0" y="${f2(ruleY)}" width="${f2(W / 2 - of.width / 2 - gap)}" height="12"/>`;
   body += `<rect x="${f2(W / 2 + of.width / 2 + gap)}" y="${f2(ruleY)}" width="${f2(W / 2 - of.width / 2 - gap)}" height="12"/>`;
-  const y2 = ofY + 130 + cap * s2;
+  const y2 = ofY + 130 * kk + (o.gapBot || 0) + cap * s2;
   // disorder grows letter by letter
-  const rot = [0, -5, 9, -14, 21], dy = [0, 14, -24, 34, -30], dx = [0, 6, -4, 14, 10];
+  const rot = o.rot || [0, -5, 9, -14, 21], dy = o.dy || [0, 14, -24, 34, -30], dx = o.dx || [0, 6, -4, 14, 10], sc = o.sc || [1, 1, 1, 1, 1];
   bot.glyphs.forEach((g, i) => {
     const cx = (g.bb.x1 + g.bb.x2) / 2, cy = (g.bb.y1 + g.bb.y2) / 2;
-    body += `<g transform="translate(${f2(-bot.minX * s2 + dx[i])} ${f2(y2 + dy[i])}) scale(${f2(s2)}) rotate(${rot[i]} ${f2(cx)} ${f2(cy)})"><path d="${g.d}"/></g>`;
+    body += `<g transform="translate(${f2(-bot.minX * s2 + dx[i])} ${f2(y2 + dy[i])}) scale(${f2(s2)}) rotate(${rot[i]} ${f2(cx)} ${f2(cy)}) translate(${f2(cx)} ${f2(cy)}) scale(${sc[i]}) translate(${f2(-cx)} ${f2(-cy)})"><path d="${g.d}"/></g>`;
   });
-  const H = y2 + 60;
-  return { w: W, h: H, body, pad: 140 };
+  const H = y2 + 60 + (o.extraH || 0);
+  return { w: W, h: H, body, pad: o.pad || 140 };
 }
 
 /* 2 — Seal: chaos star inside a ring of text (works as a profile picture / vinyl stamp) */
@@ -174,7 +175,10 @@ function monogram() {
   return { w: W, h: cap + 90 + 72 * ns + 20, body, pad: 140 };
 }
 
-for (const [name, fn] of Object.entries({ wordmark, seal, liquid, sliced, oneline, tower, monogram })) {
+/* 1X — Extra: the wordmark turned up. Wilder tumble, scale jumps; the render adds extrusion, outline and glints */
+const extra = () => wordmark({ rot: [-3, 8, -15, 22, -32], dy: [-6, 34, -4, 60, 4], dx: [-10, 0, 6, 26, 40], sc: [1, 1.06, .95, 1.1, 1.16], extraH: 60, pad: 260, ofSize: 130, gapTop: 40, gapBot: 70 });
+
+for (const [name, fn] of Object.entries({ wordmark, seal, liquid, sliced, oneline, tower, monogram, extra })) {
   const { w, h, body, pad } = fn();
   const wrap = b => `<g transform="translate(${pad} ${pad})">${b}</g>`;
   for (const [suffix, col] of [['white', '#ffffff'], ['black', '#0a0a0a']])

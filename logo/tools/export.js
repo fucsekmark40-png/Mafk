@@ -2,7 +2,7 @@
 const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
 const OUT = path.join(__dirname, '..', 'export');
-const SIZES = { wordmark: 3000, sliced: 3000, oneline: 3600, tower: 2400, monogram: 3000, seal: 2000, liquid: 3000 };
+const SIZES = { extra: 3200, wordmark: 3000, sliced: 3000, oneline: 3600, tower: 2400, monogram: 3000, seal: 2000, liquid: 3000 };
 const [only, widthArg] = process.argv.slice(2);
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });

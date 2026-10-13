@@ -2,6 +2,7 @@
 
 1. **Wordmark**: HOUSE / OF / CHAOS stacked in Archivo Expanded Black. HOUSE stays in line and CHAOS falls apart letter by letter.
 2. **Seal**: a ring of text around an eight-arrow chaos star. Use it for the profile picture, vinyl centre label, wristbands or stamps.
+- **1X Extra**: the first wordmark turned all the way up, with a wilder tumble, scale jumps, a dark 3D extrusion, a Y2K double chrome outline and glints. The effects are added in the chrome render; the flat SVG is the tumbled letters only.
 - **1B Sliced**: the same stacked block, with CHAOS cut into horizontal strips that slide sideways like a glitch.
 - **1C One line**: HOUSE ✷ CHAOS, with a chaos star replacing "OF". For banners, headers and flyer footers.
 - **1D Tower**: tall condensed Anton stack, with a vertical "OF" and CHAOS tumbling. Poster and story use.
