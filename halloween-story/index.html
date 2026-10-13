@@ -365,42 +365,24 @@ function pollSlot(g, x, y, w, h, a, arm=1, cta=1, seed=0, o={}){
 const tri = (t,c,w) => Math.max(0, 1-Math.abs(((t-c+1.5)%1)-.5)/w); // periodic pulse at c, width w
 const VARIANTS = {
   d: {
-    name:'D · MINIMÁL — 8 s reveal: a red light line cuts the black, every letter falls in as a beam of light in random order, scrambles and snaps to crimson with a flash; a strobe hit splits the type red/cyan, the poll space draws itself and the date decodes in; hold, breathe, lift out to black.',
-    dur: 8, still: 4.6/8,
+    name:'D · MINIMÁL — pure black, the crimson type is always on screen and only moves: a slow stretch wave travels through the letters twice per loop, each letter floats on its own sine, a faint red trail follows the motion. Seamless 8 s loop.',
+    dur: 8, still: .1,
     draw(t, frame){
-      const DUR = 8, T = t*DUR;
-      const easeOutExpo = x => x>=1 ? 1 : 1-Math.pow(2,-10*x);
-      const easeInCubic = x => x*x*x;
-      const easeOutBack = x => 1 + 2.4*Math.pow(x-1,3) + 1.4*Math.pow(x-1,2);
-      const hit = .6*tri(T/DUR, 1.85/DUR, .01);
-      const p = { moon:[0,0,0], moonA:0, glow:.35+.15*Math.sin(t*6.283), chrome:.8+hit*.6 };
+      const TAU = Math.PI*2;
+      // background: black + one faint ember glow
       ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
       { const g = ctx.createRadialGradient(W/2, H+260, 0, W/2, H+260, 900);
-        const a = .22 + .06*Math.sin(t*6.283);
+        const a = .22 + .06*Math.sin(t*TAU);
         g.addColorStop(0,`rgba(150,8,10,${a})`); g.addColorStop(1,'rgba(150,8,10,0)');
         ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
 
-      // ---- opening light line ----
-      if(T < .75){
-        const e = easeOutExpo(clamp01((T-.05)/.35)), fade = 1-clamp01((T-.35)/.4);
-        const lw = W*e, ly = 690;
-        ctx.save(); ctx.globalCompositeOperation='screen';
-        ctx.shadowColor='rgba(255,30,40,1)'; ctx.shadowBlur=40;
-        ctx.fillStyle=`rgba(255,60,60,${fade})`; ctx.fillRect(W/2-lw/2, ly-2, lw, 4);
-        ctx.fillStyle=`rgba(255,240,240,${fade*.9})`; ctx.fillRect(W/2-lw*.3, ly-1, lw*.6, 2);
-        ctx.restore();
-      }
-
-      // ---- headline ----
-      lx.clearRect(0,0,W,H); fx.clearRect(0,0,W,H);
+      // ---- headline: always visible, every letter moves (all motion periodic in t → seamless loop) ----
+      lx.clearRect(0,0,W,H);
       const lines = ['KIVEL','TALÁLKOZUNK?'], SY = 1.9;
       const s = fitSize(lx, SERIF, lines, 900, 200);
-      [lx,fx].forEach(g=>{ g.font = SERIF(s); g.textAlign='left'; g.textBaseline='alphabetic'; });
+      lx.font = SERIF(s); lx.textAlign='left'; lx.textBaseline='alphabetic';
       const bases = [520, 520 + s*SY*1.12];
-      const N = lines.join('').length;
-      // random landing order
-      const ord = [...Array(N).keys()]; { const r = rng(42); for(let i=N-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [ord[i],ord[j]]=[ord[j],ord[i]]; } }
-      const rank = []; ord.forEach((k,i)=>rank[k]=i);
+      const trail = [];
       let k = 0;
       lines.forEach((line, li) => {
         const total = lx.measureText(line).width, x0 = (W-total)/2;
@@ -408,60 +390,29 @@ const VARIANTS = {
           const ch = line[i];
           const xa = lx.measureText(line.slice(0,i)).width, wa = lx.measureText(line.slice(0,i+1)).width - xa;
           const cx = x0 + xa + wa/2;
-          const pIn = clamp01((T - (0.35 + rank[k]*0.075)) / 0.55);
-          const pOut = easeInCubic(clamp01((T - (7.15 + (N-1-rank[k])*0.018)) / 0.4));
-          if(pIn <= 0 || pOut >= 1) continue;
-          const breathe = Math.sin(6.283*(T/4) + k*.5)*6*clamp01((T-2)/1);
-          if(pIn < .55){
-            // beam phase: tall, thin, white, falling, scrambling
-            const e = easeOutExpo(pIn/.55);
-            const sy = SY*(6 - 5*e), sx = .12 + .5*e;
-            const glyph = ch;
-            lx.save(); lx.filter = `blur(${(8*(1-e)+1).toFixed(1)}px)`;
-            lx.globalAlpha = .35 + .65*e;
-            lx.translate(cx, bases[li] - (1-e)*320); lx.scale(sx, sy);
-            lx.fillStyle = '#ffffff'; lx.fillText(glyph, -wa/2, 0); lx.restore();
-          } else {
-            // land: real glyph, crimson, squash-settle + white flash fading
-            const q = (pIn-.55)/.45, settle = easeOutBack(q);
-            const sy = SY*(1 + .35*(1-settle)) * (1 + pOut*1.6);
-            const dy = breathe - pOut*110;
-            lx.save();
-            const bl = pOut*12; lx.filter = bl > .5 ? `blur(${bl.toFixed(1)}px)` : 'none';
-            lx.globalAlpha = 1 - pOut;
-            lx.translate(cx, bases[li] + dy); lx.scale(1, sy);
-            lx.fillStyle = RED; lx.fillText(ch, -wa/2, 0); lx.restore();
-            const flash = Math.pow(1-q, 2.2);
-            if(flash > .02){
-              fx.save(); fx.globalAlpha = flash; fx.filter='blur(2px)';
-              fx.translate(cx, bases[li] + dy); fx.scale(1, sy);
-              fx.fillStyle = '#fff4f0'; fx.fillText(ch, -wa/2, 0); fx.restore();
-            }
-          }
+          // 1) stretch wave sweeping left → right, twice per loop (sine ease, smooth peak)
+          const ph = t*2*TAU - (i/line.length)*TAU*.9 - li*1.3;
+          const crest = Math.pow(Math.max(0, Math.sin(ph)), 3);
+          // 2) individual float, slightly out of phase per letter
+          const dy = Math.sin(t*TAU*1 + k*.55)*8 - crest*16;
+          const sy = SY*(1 + .22*crest);
+          const vel = Math.cos(t*TAU + k*.55);           // for the trail direction
+          lx.save(); lx.translate(cx, bases[li] + dy); lx.scale(1, sy);
+          lx.fillStyle = RED; lx.fillText(ch, -wa/2, 0); lx.restore();
+          if(crest > .05) trail.push({ch, cx, by: bases[li] + dy + 14 + vel*6, sy: sy*1.06, a: crest*.5, wa});
         }
       });
       roughen(lx, frame, .5);
-      // strobe hit: chromatic split of the headline
-      if(false){
-        const off = 26*hit;
-        cx2.clearRect(0,0,W,H); cx2.drawImage(layer,0,0);
-        cx2.globalCompositeOperation='source-in'; cx2.fillStyle='#00e5ff'; cx2.fillRect(0,0,W,H); cx2.globalCompositeOperation='source-over';
-        ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=.75*hit;
-        ctx.drawImage(c2, off, 0); ctx.drawImage(layer, -off*1.4, 0); ctx.restore();
-      }
+      // faint red trail under the moving letters
+      ctx.save(); ctx.filter='blur(12px)'; ctx.globalCompositeOperation='screen'; ctx.font = SERIF(s); ctx.textAlign='left';
+      trail.forEach(g => { ctx.save(); ctx.globalAlpha=g.a; ctx.fillStyle='#ff1a2a'; ctx.translate(g.cx, g.by); ctx.scale(1, g.sy); ctx.fillText(g.ch, -g.wa/2, 0); ctx.restore(); });
+      ctx.restore();
       ctx.save(); ctx.shadowColor='rgba(162,0,13,.35)'; ctx.shadowBlur=18; ctx.drawImage(layer,0,0); ctx.restore();
-      ctx.save(); ctx.globalCompositeOperation='screen'; ctx.shadowColor='rgba(255,80,80,.9)'; ctx.shadowBlur=24; ctx.drawImage(flashL,0,0); ctx.restore();
 
-      // ---- poll space + date/location ----
-      const outA = 1 - clamp01((T-7.1)/.5);
-      pollSlot(ctx, 190, 990, 700, 290, outA, easeOutExpo(clamp01((T-2.0)/.5)), clamp01((T-2.05)/.5), frame, { bare:true });
-      infoSlot(ctx, 140, 1400, 800, { align:'center', bare:true, reveal: clamp01((T-2.35)/1.1)*outA, seed: frame*7 });
-
-      if(hit > 0){ ctx.save(); ctx.globalCompositeOperation='screen'; ctx.fillStyle=`rgba(255,245,240,${hit*.08})`; ctx.fillRect(0,0,W,H); ctx.restore(); }
+      // ---- poll space + date/location (static) ----
+      pollSlot(ctx, 190, 990, 700, 290, 1, 1, 1, 0, { bare:true });
+      infoSlot(ctx, 140, 1400, 800, { align:'center', bare:true });
       grain(ctx, frame, .22);
-      // fade from / to black so the replay starts clean
-      const black = Math.max(1 - clamp01(T/.3), clamp01((T-7.65)/.35));
-      if(black > 0){ ctx.fillStyle=`rgba(0,0,0,${black})`; ctx.fillRect(0,0,W,H); }
     }
   },
   a: {

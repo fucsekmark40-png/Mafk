@@ -14,7 +14,7 @@ An Instagram story at 1080×1920, built on the reference clip (`Andras1080.mp4`)
 
 ## Variants
 
-- **D · Minimál (default)**: stripped right back. Pure black, film grain and one faint ember glow at the bottom; no silk, fog or light leaks. The crimson headline sits over empty space for the IG **poll sticker** ("SZAVAZZ ↓" and whisper-thin corner marks), with the date and venue as two quiet lines and no labels. The video runs 8 s: a red light line opens, each letter falls in as a beam of light and snaps to crimson with a flash, one soft strobe follows, the date decodes in, the type breathes, then it lifts out and fades to black.
+- **D · Minimál (default)**: stripped right back. Pure black, film grain and one faint ember glow, a crimson headline over empty space for the IG **poll sticker** ("SZAVAZZ ↓" and thin corner marks), and the date and venue as two quiet lines. The letters never appear or disappear; they only move. A slow stretch wave runs through them twice per loop, each letter floats on its own sine, and a faint red trail follows. The 8 s loop is seamless.
 - **A · Vörös selyem**: closest to the reference. Full-bleed liquid silk, a big stacked crimson headline (`KIVEL / TALÁL- / KOZUNK?`), a thin crescent moon, fog rolling in low, and a web in the lower-right corner. Animation: slow glow pulse, two short type flickers, drifting fog.
 - **B · Strobe**: club minimal. Black negative space, one horizontal tear of chrome, and tall stretched chrome type with red/white strobe ghosting. Animation: a double strobe hit, then a single one.
 - **C · Telihold**: a full moon made of the liquid chrome, a fog bank across it, and blurred crimson type underneath. Animation: breathing blur and ember glow.
