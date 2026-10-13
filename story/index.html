@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kivel találkozunk?</title>
+<style>
+  @font-face { font-family: "SS4"; src: url("fonts/SourceSerif4-Black.ttf") format("truetype"); font-weight: 900; }
+  @font-face { font-family: "Anton"; src: url("fonts/Anton-Regular.ttf") format("truetype"); }
+  @font-face { font-family: "InterT"; src: url("fonts/InterTight-Medium.ttf") format("truetype"); font-weight: 500; }
+  @font-face { font-family: "InterT"; src: url("fonts/InterTight-ExtraBold.ttf") format("truetype"); font-weight: 800; }
+
+  :root {
+    --bg: #0b0a0a; --panel: #151213; --line: #2c2627; --text: #ece6e3; --muted: #948a87; --accent: #c3121a;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) { --bg: #efeae8; --panel: #fbf8f7; --line: #d9d1cf; --text: #1c1617; --muted: #6e6462; color-scheme: light; }
+  }
+  :root[data-theme="light"] { --bg: #efeae8; --panel: #fbf8f7; --line: #d9d1cf; --text: #1c1617; --muted: #6e6462; color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 "InterT", system-ui, sans-serif; }
+  .app { display: flex; gap: 24px; padding: 16px; min-height: 100vh; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+  .stage { position: relative; height: calc(100vh - 32px); max-height: 1920px; aspect-ratio: 9 / 16; max-width: 100%; }
+  .stage canvas { width: 100%; height: 100%; display: block; border-radius: 6px; background: #000; }
+  .panel { width: 300px; max-width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; }
+  .panel h1 { font-size: 15px; font-weight: 800; margin: 0; letter-spacing: .02em; }
+  .panel p { margin: 0; color: var(--muted); font-size: 12px; }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tabs button { padding: 10px 4px; line-height: 1.2; }
+  .tabs button small { display: block; color: var(--muted); font-weight: 500; font-size: 11px; }
+  .tabs button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  button, input[type=text] { font: inherit; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  button { cursor: pointer; font-weight: 800; }
+  button:hover { border-color: var(--muted); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row label { display: flex; gap: 6px; align-items: center; }
+  .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  body.export .panel { display: none; }
+  body.export .app { padding: 0; display: block; }
+  body.export .stage { height: auto; }
+  @media (max-width: 700px) { .stage { height: auto; width: 100%; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage"><canvas id="out" width="1080" height="1920"></canvas></div>
+  <aside class="panel">
+    <div>
+      <h1>KIVEL TALÁLKOZUNK? · story</h1>
+      <p>1080×1920 · 6 mp-es loop</p>
+    </div>
+    <div class="tabs" id="tabs">
+      <button data-v="a">A<small>Vörös selyem</small></button>
+      <button data-v="b">B<small>Stroboszkóp</small></button>
+      <button data-v="c">C<small>Hold &amp; köd</small></button>
+    </div>
+    <label>Dátum <input type="text" id="date" value="OKT. XX. 2026"></label>
+    <label>Helyszín <input type="text" id="place" value="HELYSZÍN"></label>
+    <div class="row">
+      <label><input type="checkbox" id="clean"> Üres hely (csak keret)</label>
+      <label><input type="checkbox" id="safe"> Safe zone</label>
+    </div>
+    <div class="row">
+      <button id="play" type="button">❚❚ Szünet</button>
+      <button id="png" class="primary">PNG letöltés</button>
+      <button id="rec">Loop felvétele (WebM)</button>
+    </div>
+    <p>Top 250 px és alsó 340 px üresen hagyva. A jelölt dátum/helyszín mező itt szerkeszthető.</p>
+    <p id="embedNote" hidden>Az előnézetben a letöltés le van tiltva – a PNG/WebM mentéshez nyisd meg a helyi <b>story/index.html</b> fájlt.</p>
+  </aside>
+</div>
+
+<script>
+(() => {
+const W = 1080, H = 1920, LOOP = 6, FPS = 30;
+const SAFE_TOP = 250, SAFE_BOTTOM = H - 340;
+const params = new URLSearchParams(location.search);
+const state = {
+  v: params.get("v") || "a",
+  date: params.get("date") ?? "OKT. XX. 2026",
+  place: params.get("place") ?? "HELYSZÍN",
+  clean: params.get("clean") === "1",
+  safe: params.get("safe") === "1",
+  playing: params.get("export") !== "1",
+};
+if (params.get("export") === "1") document.body.classList.add("export");
+
+const out = document.getElementById("out");
+const ctx = out.getContext("2d");
+
+/* ---------- WebGL: liquid satin + fog ---------- */
+const glc = document.createElement("canvas");
+glc.width = 540; glc.height = 960;
+const gl = glc.getContext("webgl", { preserveDrawingBuffer: true, premultipliedAlpha: false });
+const VS = `attribute vec2 p; varying vec2 vUv; void main(){ vUv = p*.5+.5; gl_Position = vec4(p,0.,1.); }`;
+const FS = `
+precision highp float;
+varying vec2 vUv;
+uniform float uPhase, uMode, uRedAmt, uWhite, uCyan, uSat, uMask, uFog, uSeed, uExposure;
+uniform vec3 uRed, uFogCol;
+uniform vec2 uBurst;
+const float TAU = 6.2831853;
+float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
+float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.-2.*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), u.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y); }
+float fbm(vec2 p){ float v = 0., a = .5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
+  for (int i = 0; i < 4; i++){ v += a*noise(p); p = m*p; a *= .45; } return v; }
+vec2 loopO(float r){ float a = uPhase*TAU; return r*vec2(cos(a), sin(a)); }
+float height(vec2 p){
+  vec2 o = loopO(.45);
+  vec2 q = vec2(fbm(p*.7 + o + uSeed), fbm(p*.7 + vec2(5.2, 1.3) - o.yx));
+  vec2 r = vec2(fbm(p + 2.6*q + vec2(1.7, 9.2) + o*.6), fbm(p + 2.6*q + vec2(8.3, 2.8)));
+  return fbm(p + 3.2*r);
+}
+float band(float x, float c, float w){ return smoothstep(c-w, c, x) * (1. - smoothstep(c, c+w, x)); }
+void main(){
+  vec2 uv = vUv; uv.y = 1. - uv.y;            /* y down, like canvas */
+  vec2 p = vec2(uv.x*1.5, uv.y*2.7);
+  if (uMode > .5) {                             /* fog pass */
+    vec2 o = loopO(.6);
+    float f = fbm(vec2(uv.x*1.3, uv.y*3.2) + o + vec2(0., 3.));
+    f = fbm(vec2(uv.x*1.1, uv.y*2.6) + 1.8*vec2(f, f*.4) - o*.5);
+    float lowM = smoothstep(.35, 1.0, uv.y);
+    float m = mix(1., lowM, step(.5, uFog)) ;
+    float fog = smoothstep(.35, .85, f) * m;
+    gl_FragColor = vec4(uFogCol * fog, 1.);
+    return;
+  }
+  float e = .004;
+  float h = height(p), hx = height(p + vec2(e, 0.)), hy = height(p + vec2(0., e));
+  vec3 n = normalize(vec3((h-hx)/e*.32, (h-hy)/e*.32, 1.));
+  /* glossy black satin: thin specular rims from a few coloured lights */
+  vec3 V = vec3(0., 0., 1.);
+  vec3 Lw = normalize(vec3(-.55, -.6, .58)), Lr = normalize(vec3(.6, .45, .66)), Lc = normalize(vec3(.1, .8, .6));
+  float sw = pow(max(dot(reflect(-Lw, n), V), 0.), 22.);
+  float sr = pow(max(dot(reflect(-Lr, n), V), 0.), 9.);
+  float sc = pow(max(dot(reflect(-Lc, n), V), 0.), 40.);
+  float diff = max(dot(n, normalize(vec3(.2, -.3, 1.))), 0.);
+  vec3 col = vec3(.012, .01, .011) + vec3(.05, .045, .048) * pow(diff, 6.) ;
+  col += uRed * uRedAmt * sr * 1.6 * (.6 + .8*smoothstep(.3, .7, h));
+  col += vec3(1.) * sw * (.6 + .5*uWhite);
+  col += vec3(.2, .7, .9) * uCyan * sc * .8;
+  float s = h;
+  /* bright chrome burst (reference's white zig-zag flare) */
+  float bd = length((uv - uBurst) * vec2(1., 1.6));
+  float burst = smoothstep(.5, .05, bd) * uWhite;
+  float zig = smoothstep(.25, .75, .5 + .5*sin(h*26. + n.x*4.));
+  col = mix(col, vec3(.97) * (.18 + .82*zig) + vec3(1.)*sw, clamp(burst*2.4, 0., 1.));
+  /* desaturate toward chrome */
+  float g = dot(col, vec3(.3, .55, .15));
+  col = mix(vec3(g), col, uSat);
+  /* masks for negative space */
+  float m = 1.;
+  if (uMask > .5 && uMask < 1.5) m = smoothstep(.12, .42, uv.y) * (1. - smoothstep(.6, .9, uv.y));
+  if (uMask > 1.5) m = smoothstep(.62, .86, uv.y);
+  col *= m * uExposure;
+  gl_FragColor = vec4(col, 1.);
+}`;
+function sh(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog); gl.useProgram(prog);
+const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+const U = {}; ["uPhase","uMode","uRedAmt","uWhite","uCyan","uSat","uMask","uFog","uSeed","uExposure","uRed","uFogCol","uBurst"].forEach(k => U[k] = gl.getUniformLocation(prog, k));
+gl.viewport(0, 0, glc.width, glc.height);
+
+function glPass(o){
+  gl.uniform1f(U.uPhase, o.phase); gl.uniform1f(U.uMode, o.mode || 0);
+  gl.uniform1f(U.uRedAmt, o.red ?? 1); gl.uniform1f(U.uWhite, o.white ?? 0); gl.uniform1f(U.uCyan, o.cyan ?? .5);
+  gl.uniform1f(U.uSat, o.sat ?? 1); gl.uniform1f(U.uMask, o.mask || 0); gl.uniform1f(U.uFog, o.fogLow ? 1 : 0);
+  gl.uniform1f(U.uSeed, o.seed || 0); gl.uniform1f(U.uExposure, o.exposure ?? 1);
+  gl.uniform3fv(U.uRed, o.redCol || [.95, .08, .06]); gl.uniform3fv(U.uFogCol, o.fogCol || [.5, .5, .5]);
+  gl.uniform2fv(U.uBurst, o.burst || [-1, -1]);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  return glc;
+}
+
+/* ---------- textures ---------- */
+function makeNoise(w, h, seed){
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d"), d = x.createImageData(w, h);
+  let s = seed * 9301 + 49297;
+  for (let i = 0; i < d.data.length; i += 4){
+    s = (s * 1664525 + 1013904223) >>> 0; const v = s >>> 24;
+    d.data[i] = d.data[i+1] = d.data[i+2] = v; d.data[i+3] = 255;
+  }
+  x.putImageData(d, 0, 0); return c;
+}
+const grains = [1, 2, 3, 4].map(s => makeNoise(W, H, s));
+const fine = makeNoise(512, 512, 11);
+
+function layer(){ const c = document.createElement("canvas"); c.width = W; c.height = H; return c; }
+const L1 = layer(), L2 = layer();
+
+/* deterministic pseudo random per frame — loops with the timeline */
+function rnd(n){ const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+
+/* ---------- drawing helpers ---------- */
+function setFont(c, size, fam){ c.font = fam.replace("{s}", size + "px"); }
+function fitSize(text, fam, width, sx = 1){
+  setFont(ctx, 100, fam); const w = ctx.measureText(text).width * sx; return 100 * width / w;
+}
+/* text with stretch: draws `text` with left/top-ish baseline at (x,y) scaled by sx, sy */
+function drawStretched(c, text, x, y, fam, size, sx, sy, align = "left", mode = "fill", fill){
+  c.save(); c.translate(x, y); c.scale(sx, sy); setFont(c, size, fam); c.textAlign = align; c.textBaseline = "alphabetic";
+  if (fill) c.fillStyle = fill(c, size);
+  mode === "fill" ? c.fillText(text, 0, 0) : c.strokeText(text, 0, 0); c.restore();
+}
+/* speckle the already-drawn type with grain, clipped to the letters (reference's grainy red type) */
+const speck = (() => { const c = document.createElement("canvas"); c.width = c.height = 512; const x = c.getContext("2d");
+  const d = x.createImageData(512, 512); let s = 77;
+  for (let i = 0; i < d.data.length; i += 4){ s = (s * 1664525 + 1013904223) >>> 0; const v = (s >>> 24) / 255;
+    if (v > .9){ d.data[i] = d.data[i+1] = d.data[i+2] = 255; d.data[i+3] = (v - .9) * 1500; }
+    else d.data[i+3] = Math.pow(1 - v, 2.2) * 255; }
+  x.putImageData(d, 0, 0); return c; })();
+function grainify(c, amt){
+  c.save(); c.globalCompositeOperation = "source-atop"; c.globalAlpha = amt;
+  c.fillStyle = c.createPattern(speck, "repeat"); c.fillRect(0, 0, W, H); c.restore();
+}
+function shadowPlate(src, alpha, blur, dy = 8){
+  const m = L2.getContext("2d"); m.clearRect(0, 0, W, H); m.drawImage(src, 0, 0);
+  m.globalCompositeOperation = "source-in"; m.fillStyle = "#000"; m.fillRect(0, 0, W, H); m.globalCompositeOperation = "source-over";
+  ctx.save(); ctx.filter = `blur(${blur}px)`; ctx.globalAlpha = alpha; ctx.drawImage(L2, 0, dy); ctx.drawImage(L2, 0, dy); ctx.restore();
+}
+function clear(c){ c.getContext("2d").clearRect(0, 0, W, H); }
+
+function grain(t, amt){
+  const g = grains[Math.floor(t * FPS) % grains.length];
+  ctx.save(); ctx.globalCompositeOperation = "overlay"; ctx.globalAlpha = amt; ctx.drawImage(g, 0, 0); ctx.restore();
+}
+function vignette(strength){
+  const g = ctx.createRadialGradient(W/2, H*.48, H*.22, W/2, H*.5, H*.78);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, `rgba(0,0,0,${strength})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+function glow(x, y, rx, ry, color, alpha, op = "screen"){
+  ctx.save(); ctx.globalCompositeOperation = op; ctx.globalAlpha = alpha;
+  ctx.translate(x, y); ctx.scale(1, ry / rx);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+  g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+function lightLeak(ph, side, alpha, hue = "255,90,20"){
+  const a = ph * Math.PI * 2;
+  const y = H * (side === "l" ? .3 + .08 * Math.sin(a) : .62 + .08 * Math.cos(a));
+  const x = side === "l" ? -60 : W + 60;
+  ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = alpha;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, 520);
+  g.addColorStop(0, `rgba(${hue},.95)`); g.addColorStop(.35, `rgba(${hue},.35)`); g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
+}
+function moon(x, y, r, alpha, tint = "255,214,196", haloCol = "200,40,20"){
+  glow(x, y, r * 3.2, r * 3.2, `rgba(${haloCol},.55)`, alpha * .9);
+  ctx.save(); ctx.globalAlpha = alpha;
+  const g = ctx.createRadialGradient(x - r*.35, y - r*.35, r*.1, x, y, r);
+  g.addColorStop(0, `rgba(${tint},1)`); g.addColorStop(.75, `rgba(${tint},.85)`); g.addColorStop(1, `rgba(${tint},.55)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  /* surface texture */
+  ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+  ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = alpha * .5; ctx.filter = "blur(6px)";
+  ctx.drawImage(fine, 0, 0, 40, 40, x - r, y - r, r * 2, r * 2); ctx.filter = "none";
+  /* terminator shadow */
+  ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = alpha * .55;
+  const s = ctx.createRadialGradient(x + r*.9, y + r*.5, r*.2, x + r*.9, y + r*.5, r*1.6);
+  s.addColorStop(0, "rgba(10,0,0,.9)"); s.addColorStop(1, "rgba(10,0,0,0)");
+  ctx.fillStyle = s; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.restore(); ctx.restore();
+}
+/* backlit, half-hidden moon for C */
+function ghostMoon(x, y, r, pulse){
+  glow(x, y, r * 3.4, r * 3.4, "rgba(210,40,10,.6)", .55 + .2 * pulse);
+  glow(x, y, r * 1.5, r * 1.5, "rgba(255,120,70,.6)", .35 + .1 * pulse);
+  ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+  const g = ctx.createRadialGradient(x + r * .35, y - r * .3, r * .05, x, y, r * 1.05);
+  g.addColorStop(0, "rgba(255,226,206,.95)"); g.addColorStop(.55, "rgba(236,150,120,.75)"); g.addColorStop(1, "rgba(150,30,14,.55)");
+  ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = .35; ctx.filter = "blur(10px)";
+  ctx.drawImage(fine, 100, 100, 28, 28, x - r, y - r, r * 2, r * 2); ctx.filter = "none";
+  /* eclipse shadow sliding over the disc */
+  ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = .92;
+  const sx = x - r * .55, sy = y + r * .2;
+  const s = ctx.createRadialGradient(sx, sy, r * .6, sx, sy, r * 1.25);
+  s.addColorStop(0, "rgba(6,2,2,1)"); s.addColorStop(1, "rgba(6,2,2,0)");
+  ctx.fillStyle = s; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.restore();
+}
+/* faint corner spiderweb */
+function web(cx, cy, len, a0, a1, alpha, spokes = 7, rings = 7){
+  ctx.save(); ctx.strokeStyle = `rgba(235,230,225,${alpha})`; ctx.lineWidth = 1.2;
+  const angs = []; for (let i = 0; i < spokes; i++) angs.push(a0 + (a1 - a0) * i / (spokes - 1));
+  angs.forEach((a, i) => { const l = len * (.85 + .15 * rnd(i + 3));
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * l, cy + Math.sin(a) * l); ctx.stroke(); });
+  for (let k = 1; k <= rings; k++){
+    const rr = len * (k / (rings + .6)) * (1 + .04 * rnd(k));
+    ctx.globalAlpha = 1 - k / (rings + 3);
+    ctx.beginPath();
+    for (let i = 0; i < spokes - 1; i++){
+      const p0 = [cx + Math.cos(angs[i]) * rr, cy + Math.sin(angs[i]) * rr];
+      const p1 = [cx + Math.cos(angs[i+1]) * rr, cy + Math.sin(angs[i+1]) * rr];
+      const am = (angs[i] + angs[i+1]) / 2, sag = rr * .84;
+      if (i === 0) ctx.moveTo(p0[0], p0[1]);
+      ctx.quadraticCurveTo(cx + Math.cos(am) * sag, cy + Math.sin(am) * sag, p1[0], p1[1]);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+/* editable date/location spot, marked with crop corners */
+function spot(x, y, w, h, o){
+  const c = ctx; c.save();
+  c.strokeStyle = o.mark || "rgba(255,255,255,.75)"; c.lineWidth = 2; const k = 18;
+  [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]].forEach(([px, py, dx, dy]) => {
+    c.beginPath(); c.moveTo(px + dx * k, py); c.lineTo(px, py); c.lineTo(px, py + dy * k); c.stroke(); });
+  if (state.clean){
+    c.fillStyle = o.mark || "rgba(255,255,255,.6)"; c.font = "500 15px InterT"; c.textBaseline = "middle"; c.textAlign = "left";
+    c.globalAlpha = .55; c.fillText("DÁTUM · HELYSZÍN", x + 16, y + h / 2); c.restore(); return;
+  }
+  c.fillStyle = o.color || "#fff"; c.textBaseline = "alphabetic"; c.textAlign = o.align || "left";
+  const tx = o.align === "center" ? x + w / 2 : x + 22;
+  c.font = o.font1; c.fillText(state.date, tx, y + o.y1);
+  c.font = o.font2; c.globalAlpha = .85; c.fillText(state.place, tx, y + o.y2);
+  c.restore();
+}
+function safeOverlay(){
+  ctx.save(); ctx.fillStyle = "rgba(0,170,255,.18)"; ctx.fillRect(0, 0, W, SAFE_TOP); ctx.fillRect(0, SAFE_BOTTOM, W, H - SAFE_BOTTOM);
+  ctx.strokeStyle = "rgba(0,170,255,.9)"; ctx.setLineDash([12, 10]); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, SAFE_TOP); ctx.lineTo(W, SAFE_TOP); ctx.moveTo(0, SAFE_BOTTOM); ctx.lineTo(W, SAFE_BOTTOM); ctx.stroke();
+  ctx.fillStyle = "rgba(0,170,255,1)"; ctx.font = "800 22px InterT"; ctx.fillText("SAFE ZONE 250px", 24, SAFE_TOP - 16); ctx.fillText("SAFE ZONE 340px", 24, SAFE_BOTTOM + 36);
+  ctx.restore();
+}
+
+/* ---------- variations ---------- */
+const SERIF = "900 {s} SS4", ANTON = "{s} Anton", INTER = "800 {s} InterT", INTERM = "500 {s} InterT";
+const RED = "#c3121a";
+
+const VARIANTS = {
+  /* A — Vörös selyem: closest to the reference. Red liquid satin, heavy red grainy serif, white chrome flare. */
+  a(t, ph, flick){
+    ctx.drawImage(glPass({ phase: ph, red: .95, white: 1, cyan: .7, burst: [.16, .17], exposure: 1.05 }), 0, 0, W, H);
+    vignette(.55);
+    web(W, H - 200, 380, Math.PI + .08, Math.PI * 1.5 - .1, .13, 6, 6);
+
+    /* main type */
+    const lc = L1.getContext("2d"); lc.clearRect(0, 0, W, H);
+    lc.fillStyle = RED;
+    const sx = .8, sy = 1.18;
+    const s1 = fitSize("KIVEL", SERIF, 936, 1);
+    const s2 = fitSize("TALÁLKOZUNK?", SERIF, 936, sx);
+    drawStretched(lc, "KIVEL", 72, 330 + s1 * .72 * sy, SERIF, s1, 1, sy);
+    const y2 = 330 + s1 * .72 * sy + 28 + s2 * .86 * sy;
+    drawStretched(lc, "TALÁLKOZUNK?", 72, y2, SERIF, s2, sx, sy);
+    grainify(lc, .55);
+    /* subtle red bloom = slow glow pulse */
+    const pulse = .5 + .5 * Math.sin(ph * Math.PI * 2);
+    ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = (.28 + .22 * pulse) * flick; ctx.filter = "blur(28px)";
+    ctx.drawImage(L1, 0, 0); ctx.restore();
+    shadowPlate(L1, .85, 22, 10);
+    ctx.save(); ctx.globalAlpha = flick; ctx.drawImage(L1, 0, 0); ctx.restore();
+
+    /* fog + low red glow */
+    ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = .55;
+    ctx.drawImage(glPass({ phase: ph, mode: 1, fogLow: true, fogCol: [.42, .36, .36] }), 0, 0, W, H); ctx.restore();
+    glow(W * .5, H * 1.0, 820, 360, "rgba(230,40,10,.8)", .55 + .15 * pulse);
+    lightLeak(ph, "r", .35);
+
+    spot(62, y2 + 52, 520, 132, { font1: "900 50px SS4", font2: "900 34px SS4", y1: 62, y2: 108 });
+    grain(t, .2);
+  },
+
+  /* B — Stroboszkóp: black negative space, stretched chrome Anton, motion ghost, strobe flash. */
+  b(t, ph, flick){
+    const fr = t * FPS;
+    const flash = strobe(t);
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.globalAlpha = .85;
+    ctx.drawImage(glPass({ phase: ph, red: .55, white: 0, cyan: .35, sat: .55, mask: 1, seed: 3.1, exposure: 1 + flash * 1.5 }), 0, 0, W, H);
+    ctx.restore();
+    web(0, SAFE_TOP - 120, 420, .02, Math.PI / 2 - .05, .16);
+    glow(W * .5, H + 40, 760, 420, "rgba(255,70,12,.9)", .75 + .1 * Math.sin(ph * Math.PI * 4));
+    glow(W * .5, H * .86, 900, 160, "rgba(200,20,10,.7)", .35);
+
+    /* chrome type */
+    const lc = L1.getContext("2d"); lc.clearRect(0, 0, W, H);
+    const sy = 2.05;
+    const s1 = fitSize("KIVEL", ANTON, 940);
+    const s2 = fitSize("TALÁLKOZUNK?", ANTON, 940);
+    const top = 470;
+    const y1 = top + s1 * .74 * sy * .62;
+    const chrome = (c, size) => { const g = c.createLinearGradient(0, -size * .74, 0, size * .02);
+      [[0, "#ffffff"], [.22, "#d5d9df"], [.47, "#8a8f98"], [.5, "#141416"], [.54, "#2a2a2e"], [.58, "#f2f2f4"], [.78, "#8e8378"], [.94, "#e9e4dd"], [1, "#ffffff"]].forEach(([o, k]) => g.addColorStop(o, k));
+      return g; };
+    drawStretched(lc, "KIVEL", W / 2, y1, ANTON, s1 * .62, 1, sy, "center", "fill", chrome);
+    const y2 = y1 + 70 + s2 * .9 * sy;
+    drawStretched(lc, "TALÁLKOZUNK?", W / 2, y2, ANTON, s2, 1, sy, "center", "fill", chrome);
+    lc.save(); lc.globalCompositeOperation = "source-atop"; lc.globalAlpha = .18; lc.drawImage(glc, 0, 0, W, H); lc.restore();
+    grainify(lc, .12);
+
+    /* motion / strobe ghosts: red left, blurred white right */
+    const jit = (rnd(Math.floor(fr / 3)) - .5) * 10;
+    ctx.save(); ctx.globalCompositeOperation = "screen";
+    ctx.filter = "blur(18px)"; ctx.globalAlpha = .55; ctx.drawImage(L1, -36 + jit, 0);
+    ctx.globalCompositeOperation = "source-over"; ctx.filter = "none";
+    ctx.restore();
+    const L = L2.getContext("2d"); L.clearRect(0, 0, W, H); L.drawImage(L1, 0, 0);
+    L.globalCompositeOperation = "source-in"; L.fillStyle = "#e0140c"; L.fillRect(0, 0, W, H); L.globalCompositeOperation = "source-over";
+    ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = .9; ctx.filter = "blur(3px)"; ctx.drawImage(L2, -14 - jit * .5, 6); ctx.restore();
+    ctx.save(); ctx.globalAlpha = flick; ctx.drawImage(L1, 0, 0); ctx.restore();
+    /* horizontal flash streak */
+    ctx.save(); ctx.globalCompositeOperation = "screen";
+    const sg = ctx.createLinearGradient(0, 0, W, 0);
+    sg.addColorStop(0, "rgba(255,255,255,0)"); sg.addColorStop(.5, "rgba(255,240,230,.55)"); sg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sg; ctx.filter = "blur(8px)"; ctx.fillRect(0, y1 + 30, W, 5); ctx.restore();
+
+    ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = .45;
+    ctx.drawImage(glPass({ phase: ph, mode: 1, fogLow: true, seed: 2, fogCol: [.5, .2, .14] }), 0, 0, W, H); ctx.restore();
+
+    spot(64, 1394, 470, 120, { font1: "800 40px InterT", font2: "500 28px InterT", y1: 52, y2: 94 });
+    ctx.save(); ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.font = "500 20px InterT"; ctx.textAlign = "right";
+    ctx.fillText("HALLOWEEN · 2026", W - 64, 1508); ctx.restore();
+    lightLeak(ph, "l", .22, "255,60,30");
+
+    if (flash > 0){ ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = flash * .7; ctx.fillStyle = "#fff4ee"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+    grain(t, .24);
+  },
+
+  /* C — Hold & köd: red moon, fog, satin lake, lots of negative space. */
+  c(t, ph, flick){
+    const pulse = .5 + .5 * Math.sin(ph * Math.PI * 2);
+    ctx.fillStyle = "#030202"; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(glPass({ phase: ph, red: 1.1, white: .1, cyan: .15, sat: .85, mask: 2, seed: 7.7, redCol: [1, .25, .06], exposure: .8 }), 0, 0, W, H);
+    ghostMoon(W / 2, 700, 260, pulse);
+    /* moon reflection on the satin lake */
+    glow(W / 2, 1490, 300, 60, "rgba(255,90,30,.9)", .35 + .15 * pulse);
+    ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = .75;
+    ctx.drawImage(glPass({ phase: ph, mode: 1, fogCol: [.32, .2, .19], seed: 4 }), 0, 0, W, H); ctx.restore();
+    web(W, SAFE_TOP - 140, 360, Math.PI / 2 + .1, Math.PI - .05, .12, 6, 6);
+
+    const lc = L1.getContext("2d"); lc.clearRect(0, 0, W, H);
+    lc.fillStyle = "#ff3a1c";
+    const s1 = fitSize("Kivel", SERIF, 520), s2 = fitSize("találkozunk?", SERIF, 920);
+    const yb1 = 1010, yb2 = yb1 + s2 * 1.02;
+    drawStretched(lc, "Kivel", W / 2, yb1, SERIF, s1, 1, 1, "center");
+    drawStretched(lc, "találkozunk?", W / 2, yb2, SERIF, s2, 1, 1, "center");
+    lc.globalCompositeOperation = "source-atop";
+    const tg = lc.createLinearGradient(0, yb1 - s1, 0, yb2);
+    tg.addColorStop(0, "#ff4a26"); tg.addColorStop(1, "#a00a08"); lc.fillStyle = tg; lc.fillRect(0, 0, W, H);
+    lc.globalCompositeOperation = "source-over";
+    grainify(lc, .45);
+    ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.filter = "blur(40px)"; ctx.globalAlpha = (.55 + .3 * pulse) * flick; ctx.drawImage(L1, 0, 0); ctx.restore();
+    /* dark plate behind the type so it reads over the moon */
+    ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.filter = "blur(30px)"; ctx.globalAlpha = .9;
+    const lm = L2.getContext("2d"); lm.clearRect(0, 0, W, H); lm.drawImage(L1, 0, 0); lm.globalCompositeOperation = "source-in"; lm.fillStyle = "#000"; lm.fillRect(0, 0, W, H); lm.globalCompositeOperation = "source-over";
+    ctx.drawImage(L2, 0, 10); ctx.restore();
+    ctx.save(); ctx.globalAlpha = flick; ctx.drawImage(L1, 0, 0); ctx.restore();
+
+    ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = .5;
+    ctx.drawImage(glPass({ phase: (ph + .5) % 1, mode: 1, fogLow: true, fogCol: [.35, .3, .3], seed: 9 }), 0, 0, W, H); ctx.restore();
+    vignette(.6);
+    lightLeak(ph, "l", .18); lightLeak((ph + .3) % 1, "r", .14, "255,40,20");
+
+    spot(W / 2 - 240, 1330, 480, 118, { align: "center", font1: "800 38px InterT", font2: "500 27px InterT", y1: 52, y2: 92, color: "#f2e7e2" });
+    grain(t, .22);
+  },
+};
+
+/* strobe envelope for B: two quick double-hits per loop */
+function strobe(t){
+  const hits = [1.2, 1.32, 4.1, 4.2];
+  let v = 0; for (const h of hits){ const d = t - h; if (d >= 0 && d < .1) v = Math.max(v, 1 - d / .1); }
+  return v;
+}
+/* text flicker: mostly steady, rare quick dips */
+function flicker(t, v){
+  const f = Math.floor(t * FPS);
+  if (v === "b") return 1;
+  const dips = v === "a" ? [44, 46, 131] : [27, 28, 30, 102, 151, 152];
+  return dips.includes(f % (LOOP * FPS)) ? .35 + .3 * rnd(f) : 1;
+}
+
+function render(t){
+  t = ((t % LOOP) + LOOP) % LOOP;
+  ctx.save(); ctx.clearRect(0, 0, W, H);
+  VARIANTS[state.v](t, t / LOOP, flicker(t, state.v));
+  ctx.restore();
+  if (state.safe) safeOverlay();
+}
+
+/* ---------- UI + loop ---------- */
+let t0 = performance.now(), tPaused = 0;
+function tick(now){ if (state.playing) render((now - t0) / 1000); requestAnimationFrame(tick); }
+const $ = id => document.getElementById(id);
+function sync(){
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === state.v));
+  if (!state.playing) render(tPaused);
+}
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { state.v = b.dataset.v; sync(); });
+$("date").value = state.date; $("place").value = state.place; $("clean").checked = state.clean; $("safe").checked = state.safe;
+$("date").oninput = e => { state.date = e.target.value; sync(); };
+$("place").oninput = e => { state.place = e.target.value; sync(); };
+$("clean").onchange = e => { state.clean = e.target.checked; sync(); };
+$("safe").onchange = e => { state.safe = e.target.checked; sync(); };
+$("play").onclick = () => {
+  state.playing = !state.playing;
+  if (state.playing) t0 = performance.now() - tPaused * 1000; else tPaused = ((performance.now() - t0) / 1000) % LOOP;
+  $("play").textContent = state.playing ? "❚❚ Szünet" : "▶ Lejátszás"; sync();
+};
+$("png").onclick = () => {
+  const wasSafe = state.safe; state.safe = false; render(state.playing ? ((performance.now() - t0) / 1000) : tPaused); state.safe = wasSafe;
+  out.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `kivel-talalkozunk-${state.v}.png`; a.click(); });
+};
+$("rec").onclick = () => {
+  const btn = $("rec"); if (!window.MediaRecorder) return alert("A böngésző nem támogatja a felvételt.");
+  const stream = out.captureStream(FPS), chunks = [];
+  const rec = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm", videoBitsPerSecond: 16e6 });
+  rec.ondataavailable = e => chunks.push(e.data);
+  rec.onstop = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(chunks, { type: "video/webm" })); a.download = `kivel-talalkozunk-${state.v}.webm`; a.click(); btn.textContent = "Loop felvétele (WebM)"; };
+  const wasSafe = state.safe; state.safe = false; state.playing = true; t0 = performance.now();
+  rec.start(); btn.textContent = "Felvétel…";
+  setTimeout(() => { rec.stop(); state.safe = wasSafe; }, LOOP * 1000);
+};
+
+let embedded = false; try { embedded = window.self !== window.top; } catch (e) { embedded = true; }
+if (embedded) { $("png").hidden = true; $("rec").hidden = true; $("embedNote").hidden = false; }
+if (matchMedia("(prefers-reduced-motion: reduce)").matches && params.get("export") !== "1") { state.playing = false; tPaused = .5; $("play").textContent = "▶ Lejátszás"; }
+
+window.__ready = Promise.all([document.fonts.load("900 50px SS4"), document.fonts.load("50px Anton"), document.fonts.load("500 20px InterT"), document.fonts.load("800 20px InterT")])
+  .then(() => { sync(); render(Number(params.get("t") || 0)); if (params.get("export") !== "1") requestAnimationFrame(tick); });
+window.__render = (t, opts = {}) => { Object.assign(state, opts); render(t); };
+window.__frame = () => out.toDataURL("image/png");
+})();
+</script>
+</body>
+</html>
