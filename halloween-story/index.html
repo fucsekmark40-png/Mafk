@@ -304,6 +304,14 @@ function infoSlot(g, x, y, w, opts){
   const center = opts.align === 'center', h = center ? 200 : 150;
   const rev = opts.reveal ?? 1, arm = opts.arm ?? 1, seed = opts.seed ?? 0;
   g.save();
+  if(opts.bare){
+    const cx = x+w/2; g.textAlign='center'; g.textBaseline='alphabetic';
+    g.fillStyle='#f2eeee';
+    const line = (t,py,sz,p,sd)=>{ g.font = SERIF7(fitSize(g, SERIF7, [t], w, sz)); const fw = g.measureText(t).width; g.textAlign='left'; g.fillText(scramble(t, p, sd), cx-fw/2, py); };
+    line(date, y+40, 32, clamp01(rev*1.6), seed+1);
+    g.globalAlpha *= .7; line(loc, y+88, 26, clamp01(rev*1.6-.6), seed+2);
+    g.restore(); return;
+  }
   if(state.guides && arm > 0){
     g.strokeStyle='rgba(235,230,230,.55)'; g.lineWidth=2; const c=22*arm;
     const br=(px,py,dx,dy)=>{ g.beginPath(); g.moveTo(px+dx*c,py); g.lineTo(px,py); g.lineTo(px,py+dy*c); g.stroke(); };
@@ -332,7 +340,7 @@ function infoSlot(g, x, y, w, opts){
 }
 
 // Reserved space for the Instagram poll sticker: a small CTA above, faint brackets around
-function pollSlot(g, x, y, w, h, a, arm=1, cta=1, seed=0){
+function pollSlot(g, x, y, w, h, a, arm=1, cta=1, seed=0, o={}){
   if(a <= 0) return;
   g.save(); g.globalAlpha = a;
   g.textAlign='center'; g.textBaseline='alphabetic';
@@ -344,10 +352,10 @@ function pollSlot(g, x, y, w, h, a, arm=1, cta=1, seed=0){
   g.strokeStyle='#f2eeee'; g.lineWidth=2.5; g.beginPath();
   g.moveTo(ax, ay); g.lineTo(ax, ay+20); g.moveTo(ax-7, ay+13); g.lineTo(ax, ay+20); g.lineTo(ax+7, ay+13); g.stroke();
   if(state.guides){
-    g.globalAlpha = a; g.strokeStyle='rgba(235,230,230,.35)'; g.lineWidth=2; const c=26*arm;
+    g.globalAlpha = a; g.strokeStyle = o.bare ? 'rgba(235,230,230,.18)' : 'rgba(235,230,230,.35)'; g.lineWidth = o.bare ? 1.5 : 2; const c=(o.bare ? 18 : 26)*arm;
     const br=(px,py,dx,dy)=>{ g.beginPath(); g.moveTo(px+dx*c,py); g.lineTo(px,py); g.lineTo(px,py+dy*c); g.stroke(); };
     br(x,y,1,1); br(x+w,y,-1,1); br(x,y+h,1,-1); br(x+w,y+h,-1,-1);
-    g.globalAlpha = a*clamp01(arm*2-1); g.fillStyle='rgba(235,230,230,.28)'; g.font = MONO(18);
+    g.globalAlpha = o.bare ? 0 : a*clamp01(arm*2-1); g.fillStyle='rgba(235,230,230,.28)'; g.font = MONO(18);
     g.fillText('SZAVAZÁS MATRICA HELYE', x+w/2, y+h/2+6);
   }
   g.restore();
@@ -364,10 +372,13 @@ const VARIANTS = {
       const easeOutExpo = x => x>=1 ? 1 : 1-Math.pow(2,-10*x);
       const easeInCubic = x => x*x*x;
       const easeOutBack = x => 1 + 2.4*Math.pow(x-1,3) + 1.4*Math.pow(x-1,2);
-      const hit = Math.max(tri(T/DUR, 1.85/DUR, .012), .5*tri(T/DUR, 5.3/DUR, .006));
+      const hit = .6*tri(T/DUR, 1.85/DUR, .01);
       const p = { moon:[0,0,0], moonA:0, glow:.35+.15*Math.sin(t*6.283), chrome:.8+hit*.6 };
-      ctx.drawImage(glPass(0,3,t,p),0,0,W,H);
-      ctx.save(); ctx.globalAlpha=.8; ctx.drawImage(glPass(1,3,t,p),0,0,W,H); ctx.restore();
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+      { const g = ctx.createRadialGradient(W/2, H+260, 0, W/2, H+260, 900);
+        const a = .22 + .06*Math.sin(t*6.283);
+        g.addColorStop(0,`rgba(150,8,10,${a})`); g.addColorStop(1,'rgba(150,8,10,0)');
+        ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
 
       // ---- opening light line ----
       if(T < .75){
@@ -405,7 +416,7 @@ const VARIANTS = {
             // beam phase: tall, thin, white, falling, scrambling
             const e = easeOutExpo(pIn/.55);
             const sy = SY*(6 - 5*e), sx = .12 + .5*e;
-            const glyph = BEAM[Math.floor(rng(frame*31+k)()*BEAM.length)];
+            const glyph = ch;
             lx.save(); lx.filter = `blur(${(8*(1-e)+1).toFixed(1)}px)`;
             lx.globalAlpha = .35 + .65*e;
             lx.translate(cx, bases[li] - (1-e)*320); lx.scale(sx, sy);
@@ -431,24 +442,22 @@ const VARIANTS = {
       });
       roughen(lx, frame, .5);
       // strobe hit: chromatic split of the headline
-      if(hit > .03){
+      if(false){
         const off = 26*hit;
         cx2.clearRect(0,0,W,H); cx2.drawImage(layer,0,0);
         cx2.globalCompositeOperation='source-in'; cx2.fillStyle='#00e5ff'; cx2.fillRect(0,0,W,H); cx2.globalCompositeOperation='source-over';
         ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=.75*hit;
         ctx.drawImage(c2, off, 0); ctx.drawImage(layer, -off*1.4, 0); ctx.restore();
       }
-      ctx.save(); ctx.shadowColor='rgba(162,0,13,.5)'; ctx.shadowBlur=30; ctx.drawImage(layer,0,0); ctx.restore();
+      ctx.save(); ctx.shadowColor='rgba(162,0,13,.35)'; ctx.shadowBlur=18; ctx.drawImage(layer,0,0); ctx.restore();
       ctx.save(); ctx.globalCompositeOperation='screen'; ctx.shadowColor='rgba(255,80,80,.9)'; ctx.shadowBlur=24; ctx.drawImage(flashL,0,0); ctx.restore();
 
       // ---- poll space + date/location ----
       const outA = 1 - clamp01((T-7.1)/.5);
-      pollSlot(ctx, 190, 990, 700, 290, outA, easeOutExpo(clamp01((T-2.0)/.5)), clamp01((T-2.05)/.5), frame);
-      infoSlot(ctx, 140, 1360, 800, { align:'center', reveal: clamp01((T-2.35)/1.1)*outA + (outA<1 ? 0 : 0), arm: easeOutExpo(clamp01((T-2.2)/.5))*outA, seed: frame*7 });
+      pollSlot(ctx, 190, 990, 700, 290, outA, easeOutExpo(clamp01((T-2.0)/.5)), clamp01((T-2.05)/.5), frame, { bare:true });
+      infoSlot(ctx, 140, 1400, 800, { align:'center', bare:true, reveal: clamp01((T-2.35)/1.1)*outA, seed: frame*7 });
 
-      if(hit > 0){ ctx.save(); ctx.globalCompositeOperation='screen'; ctx.fillStyle=`rgba(255,245,240,${hit*.12})`; ctx.fillRect(0,0,W,H); ctx.restore(); }
-      lightLeak(ctx, W+60, 1700, 700, 'rgba(255,50,20,A)', .12+.06*Math.sin(t*6.283));
-      vignette(ctx,.6);
+      if(hit > 0){ ctx.save(); ctx.globalCompositeOperation='screen'; ctx.fillStyle=`rgba(255,245,240,${hit*.08})`; ctx.fillRect(0,0,W,H); ctx.restore(); }
       grain(ctx, frame, .22);
       // fade from / to black so the replay starts clean
       const black = Math.max(1 - clamp01(T/.3), clamp01((T-7.65)/.35));
