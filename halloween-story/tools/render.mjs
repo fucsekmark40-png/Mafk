@@ -25,7 +25,7 @@ for (const v of list.split(',')) {
       save(path.join(out, `_test-${v}-${f}.png`), await page.evaluate(([v, f]) => window.renderFrame(v, f), [v, f]));
   } else if (mode === 'still') {
     const t0 = Date.now();
-    save(path.join(out, `kivel-talalkozunk-${v}.png`), await page.evaluate(v => window.renderFrame(v, 22), v));
+    save(path.join(out, `kivel-talalkozunk-${v}.png`), await page.evaluate(v => window.renderFrame(v, 22, 'still'), v));
     console.log(v, 'still', Date.now() - t0, 'ms');
   } else {
     const dir = path.join(out, `_frames_${v}`); rmSync(dir, { recursive: true, force: true }); mkdirSync(dir);

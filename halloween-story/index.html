@@ -23,7 +23,7 @@
   .safe .bot { bottom:0; height:calc(340/1920*100%); display:flex; align-items:flex-end; }
   .panel { width:300px; max-width:100%; background:var(--panel); border:1px solid var(--line); padding:16px; display:flex; flex-direction:column; gap:14px; }
   .panel h1 { font:900 20px/1.1 Merriweather, serif; margin:0; color:var(--red); }
-  .tabs { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .tabs { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
   button, .tabs button { background:#1d1212; color:var(--ink); border:1px solid var(--line); padding:8px 6px; font:inherit; cursor:pointer; }
   button:hover { border-color:#5a2a2a; }
   .tabs button.on { background:var(--red); border-color:var(--red); color:#fff; }
@@ -47,6 +47,7 @@
       <button data-v="a">A · Selyem</button>
       <button data-v="b">B · Strobe</button>
       <button data-v="c">C · Hold</button>
+      <button data-v="d">D · Minimal</button>
     </div>
     <div class="vname" id="vname"></div>
     <label>Dátum <input type="text" id="date" value="2026. OKT. XX. · 22:00"></label>
@@ -66,7 +67,7 @@ const W = 1080, H = 1920, LOOP = 6; // seconds
 const RED = '#a2000d';
 const qs = new URLSearchParams(location.search);
 const state = {
-  v: qs.get('v') || 'a',
+  v: qs.get('v') || 'd',
   date: qs.get('date') || null,
   loc: qs.get('loc') || null,
   anim: qs.get('static') ? false : true,
@@ -129,7 +130,8 @@ void main(){
     float band;
     if(uVar==0) band = smoothstep(.55,1.,y)*1.0 + smoothstep(.25,.0,abs(y-.33))*.25;
     else if(uVar==1) band = smoothstep(.6,1.,y)*.8 + smoothstep(.12,.0,abs(y-.5))*.35;
-    else band = smoothstep(.5,.95,y)*1.0 + smoothstep(.09,.0,abs(y-.43))*.9;
+    else if(uVar==2) band = smoothstep(.5,.95,y)*1.0 + smoothstep(.09,.0,abs(y-.43))*.9;
+    else band = smoothstep(.68,1.,y)*.9;
     float d = clamp(smoothstep(-.1,.6,f)*band,0.,1.)*.42;
     vec3 c = mix(vec3(.5,.48,.49), vec3(.6,.1,.06), smoothstep(.6,1.,y)*.6);
     gl_FragColor = vec4(c*d, d);
@@ -171,6 +173,7 @@ void main(){
   if(uVar==2){
     mask = .12 + disk*1.0;
   }
+  if(uVar==3) mask = .05 + .55*smoothstep(.8,1.05,y);   // minimal: black, silk only as a floor
   col *= mask;
   if(uMoonA>0.){
     float crat = fbm(vec3(dv*14., 40.))*.5+.5;
@@ -300,9 +303,95 @@ function infoSlot(g, x, y, w, opts){
   g.restore();
 }
 
+// Reserved space for the Instagram poll sticker: a small CTA above, faint brackets around
+function pollSlot(g, x, y, w, h, a){
+  if(a <= 0) return;
+  g.save(); g.globalAlpha = a;
+  g.textAlign='center'; g.textBaseline='alphabetic';
+  g.fillStyle='#f2eeee'; g.font = MONO(24,700);
+  g.fillText('SZAVAZZ', x+w/2, y-44);
+  // hand-drawn arrow (the mono font has no ↓ glyph)
+  const ax = x+w/2, ay = y-30;
+  g.strokeStyle='#f2eeee'; g.lineWidth=2.5; g.beginPath();
+  g.moveTo(ax, ay); g.lineTo(ax, ay+20); g.moveTo(ax-7, ay+13); g.lineTo(ax, ay+20); g.lineTo(ax+7, ay+13); g.stroke();
+  if(state.guides){
+    g.strokeStyle='rgba(235,230,230,.35)'; g.lineWidth=2; const c=26;
+    const br=(px,py,dx,dy)=>{ g.beginPath(); g.moveTo(px+dx*c,py); g.lineTo(px,py); g.lineTo(px,py+dy*c); g.stroke(); };
+    br(x,y,1,1); br(x+w,y,-1,1); br(x,y+h,1,-1); br(x+w,y+h,-1,-1);
+    g.fillStyle='rgba(235,230,230,.28)'; g.font = MONO(18);
+    g.fillText('SZAVAZÁS MATRICA HELYE', x+w/2, y+h/2+6);
+  }
+  g.restore();
+}
+
 /* ---------------- Variants ---------------- */
 const tri = (t,c,w) => Math.max(0, 1-Math.abs(((t-c+1.5)%1)-.5)/w); // periodic pulse at c, width w
 const VARIANTS = {
+  d: {
+    name:'D · MINIMÁL — mostly black, kinetic stretched crimson type (letters stagger in, breathe, glitch on a strobe hit, then lift out), a reserved space for the IG poll sticker, and silk only as a floor.',
+    still: .45,
+    draw(t, frame){
+      const T = t*LOOP;
+      const hit = Math.max(tri(t,.52,.008), .6*tri(t,.545,.006));        // strobe hit ≈ 3.1 s
+      const p = { moon:[0,0,0], moonA:0, glow:.35+.15*Math.sin(t*6.283), chrome:.8+hit*.6 };
+      ctx.drawImage(glPass(0,3,t,p),0,0,W,H);
+      ctx.save(); ctx.globalAlpha=.8; ctx.drawImage(glPass(1,3,t,p),0,0,W,H); ctx.restore();
+      // ---- kinetic headline: per-glyph transforms ----
+      lx.clearRect(0,0,W,H);
+      const lines = ['KIVEL','TALÁLKOZUNK?'], SY = 1.9;
+      const s = fitSize(lx, SERIF, lines, 900, 200);
+      lx.font = SERIF(s); lx.textAlign='left'; lx.textBaseline='alphabetic';
+      const bases = [520, 520 + s*SY*1.12];
+      const easeOutExpo = x => x>=1 ? 1 : 1-Math.pow(2,-10*x);
+      const easeInCubic = x => x*x*x;
+      const clamp01 = x => Math.max(0, Math.min(1, x));
+      const hash = k => { const r = rng(k*97+5); return r(); };
+      let k = 0;
+      const ghosts = [];
+      lines.forEach((line, li) => {
+        const total = lx.measureText(line).width, x0 = (W-total)/2;
+        for(let i=0;i<line.length;i++,k++){
+          const ch = line[i];
+          const xa = lx.measureText(line.slice(0,i)).width, wa = lx.measureText(line.slice(0,i+1)).width - xa;
+          const ein = easeOutExpo(clamp01((T - (0.12 + k*0.028)) / 0.75));   // stagger 28 ms → 476 ms budget
+          const eout = easeInCubic(clamp01((T - (4.85 + k*0.02)) / 0.45));   // exits faster than entrances
+          const live = ein*(1-eout);
+          if(live <= 0.001) continue;
+          let dy = (1-ein)*70 - eout*90 + Math.sin(6.283*(T/3) + k*.5)*6*live;   // breathe (period 3 s → loops)
+          let sy = SY*(1 + (1-ein)*1.4 + eout*1.8), dx = 0, sx = 1;
+          if(hit > .05 && hash(k) < .4){ dx = (hash(k+31)-.5)*70*hit; sx = 1 + hit*.5; }
+          const blur = (1-ein)*16 + eout*12;
+          const cx = x0 + xa + wa/2, by = bases[li] + dy;
+          lx.save();
+          lx.filter = blur > .5 ? `blur(${blur.toFixed(1)}px)` : 'none';
+          lx.globalAlpha = live;
+          lx.translate(cx + dx, by); lx.scale(sx, sy);
+          lx.fillStyle = RED; lx.fillText(ch, -wa/2, 0);
+          lx.restore();
+          // secondary layer: ghost trail during motion
+          const motion = (1-ein) + eout + hit;
+          if(motion > .02) ghosts.push({ch, cx: cx - dx*.6, by: by + (1-ein)*60, sy: sy*1.15, a: Math.min(1,motion)*.45*Math.max(live,.3), wa});
+        }
+      });
+      roughen(lx, frame, .5);
+      // ghosts behind the type
+      ctx.save(); ctx.filter='blur(10px)'; ctx.globalCompositeOperation='screen'; ctx.font = SERIF(s); ctx.textAlign='left';
+      ghosts.forEach(g => { ctx.save(); ctx.globalAlpha=g.a; ctx.fillStyle='#ff1a2a'; ctx.translate(g.cx, g.by); ctx.scale(1, g.sy); ctx.fillText(g.ch, -g.wa/2, 0); ctx.restore(); });
+      ctx.restore();
+      ctx.save(); ctx.shadowColor='rgba(162,0,13,.45)'; ctx.shadowBlur=30; ctx.drawImage(layer,0,0); ctx.restore();
+      // ---- poll sticker space ----
+      const pollIn = easeOutExpo(clamp01((T-.9)/.6)) * (1 - easeInCubic(clamp01((T-5.0)/.4)));
+      pollSlot(ctx, 190, 990, 700, 290, pollIn);
+      infoSlot(ctx, 140, 1360, 800, { align:'center' });
+      if(hit > 0){
+        ctx.save(); ctx.globalCompositeOperation='screen'; ctx.fillStyle=`rgba(255,245,240,${hit*.1})`; ctx.fillRect(0,0,W,H); ctx.restore();
+      }
+      lightLeak(ctx, W+60, 1700, 700, 'rgba(255,50,20,A)', .12+.06*Math.sin(t*6.283));
+      vignette(ctx,.6);
+      grain(ctx, frame, .22);
+    }
+  },
+
   a: {
     name:'A · VÖRÖS SELYEM — the reference, almost one to one: liquid chrome-silk, large grainy crimson stacked type, fog pouring in low, a faint moon and spiderweb.',
     draw(t, frame){
@@ -422,7 +511,8 @@ function roughen(g, frame, amt=.55){
 const FPS = 30;
 function render(t, frame){ ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over'; ctx.filter='none';
   ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); VARIANTS[state.v].draw(t, frame); }
-window.renderFrame = (v, frame) => { state.v = v;
+window.renderFrame = (v, frame, tOverride) => { state.v = v;
+  if(tOverride != null){ render(tOverride === 'still' ? (VARIANTS[v].still ?? (frame % (LOOP*FPS)) / (LOOP*FPS)) : tOverride, frame); return cv.toDataURL('image/png'); }
   if(window.bgOnly){ ctx.drawImage(glPass(0,{a:0,b:1,c:2}[v],.12,{moon:[0,0,0],moonA:0,glow:0,chrome:1}),0,0,W,H); return cv.toDataURL('image/png'); } render((frame % (LOOP*FPS)) / (LOOP*FPS), frame); return cv.toDataURL('image/png'); };
 window.setState = o => Object.assign(state, o);
 
@@ -431,7 +521,7 @@ function tick(now){
   if(state.anim){ const sec = ((now-start)/1000) % LOOP; render(sec/LOOP, Math.floor((now-start)/1000*FPS)); }
   requestAnimationFrame(tick);
 }
-function staticRender(){ render(0.12, 0); }
+function staticRender(){ render(VARIANTS[state.v].still ?? 0.12, 0); }
 const tabs = document.querySelectorAll('#tabs button');
 function setV(v){ state.v=v; tabs.forEach(b=>b.classList.toggle('on', b.dataset.v===v)); document.getElementById('vname').textContent=VARIANTS[v].name; if(!state.anim) staticRender(); }
 tabs.forEach(b=>b.onclick=()=>setV(b.dataset.v));

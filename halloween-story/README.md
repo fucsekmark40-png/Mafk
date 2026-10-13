@@ -7,13 +7,14 @@ An Instagram story at 1080×1920, built on the reference clip (`Andras1080.mp4`)
 | | |
 |---|---|
 | `index.html` | Live preview. Switch variants, edit date and location, toggle the IG safe-zone overlay, export a PNG, record a 6 s WebM |
-| `export/kivel-talalkozunk-{a,b,c}.png` | Stills at 1080×1920 |
-| `export/kivel-talalkozunk-{a,b,c}-loop.mp4` | 6 s seamless loops, 30 fps, H.264 |
+| `export/kivel-talalkozunk-{a,b,c,d}.png` | Stills at 1080×1920 |
+| `export/kivel-talalkozunk-{a,b,c,d}-loop.mp4` | 6 s seamless loops, 30 fps, H.264 |
 | `fonts/` | Merriweather Bold and Black, Space Mono (SIL OFL), bundled so the page renders offline |
 | `tools/render.mjs` | Headless re-export of the PNGs and MP4s |
 
 ## Variants
 
+- **D · Minimál (default)**: the most minimal. Mostly black, stretched crimson type that moves letter by letter, a reserved space for the IG **poll sticker** ("SZAVAZZ ↓" plus corner brackets), and the liquid silk only as a thin floor at the bottom. Animation (6 s loop): the letters stagger in with a stretch and blur, breathe, glitch on one strobe hit at about 3.1 s, then lift out; a red ghost trail follows the motion.
 - **A · Vörös selyem**: closest to the reference. Full-bleed liquid silk, a big stacked crimson headline (`KIVEL / TALÁL- / KOZUNK?`), a thin crescent moon, fog rolling in low, and a web in the lower-right corner. Animation: slow glow pulse, two short type flickers, drifting fog.
 - **B · Strobe**: club minimal. Black negative space, one horizontal tear of chrome, and tall stretched chrome type with red/white strobe ghosting. Animation: a double strobe hit, then a single one.
 - **C · Telihold**: a full moon made of the liquid chrome, a fog bank across it, and blurred crimson type underneath. Animation: breathing blur and ember glow.
@@ -24,6 +25,8 @@ The slot sits between the corner brackets above the bottom safe zone. You can ch
 - type into the fields in `index.html`, then press **PNG letöltése**
 - use URL params: `index.html?v=a&date=2026.%20OKT.%2031.%20·%2022:00&loc=AKVÁRIUM`
 - turn the brackets off with the checkbox (or `&guides=0`)
+
+**Poll (D):** put the Instagram poll sticker inside the brackets under "SZAVAZZ" (x 190–890, y 990–1280). The bracket and the "SZAVAZÁS MATRICA HELYE" label are guides, so turn them off with the checkbox if you want.
 
 The headline stays between y=250 and y=1580 on every variant, outside Instagram's top 250px and bottom 340px.
 
