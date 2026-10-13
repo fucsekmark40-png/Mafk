@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>House of Chaos</title>
+<style>
+  /* Layout: a dark showroom; one large chrome render per concept with its flat versions underneath. Single dark look on purpose (chrome reads on black). */
+  @font-face { font-family: "ArchX"; src: url("fonts/Archivo-ExpandedBlack.ttf") format("truetype"); font-weight: 900; }
+  :root {
+    --ground: #070708; --plate: #0f0f11; --hair: #24242a; --ink: #e8e8ec; --dim: #8a8a94; --signal: #c3121a;
+    --display: "ArchX", "Arial Black", sans-serif;
+    --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.5 var(--body); }
+  main { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: grid; gap: 48px; }
+  header { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--hair); padding-bottom: 20px; }
+  header h1 { font: 900 clamp(22px, 3.4vw, 34px)/1 var(--display); letter-spacing: -.01em; margin: 0; }
+  header p { margin: 6px 0 0; color: var(--dim); max-width: 60ch; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font: 600 13px/1 var(--body); color: var(--ink); background: transparent; border: 1px solid var(--hair); border-radius: 999px; padding: 10px 14px; cursor: pointer; }
+  button:hover { border-color: var(--dim); }
+  button[aria-pressed="true"] { border-color: var(--ink); }
+  button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+  section { display: grid; gap: 16px; }
+  .label { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+  .label h2 { font: 900 15px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; margin: 0; }
+  .label span { color: var(--dim); font-size: 14px; }
+  .hero { background: radial-gradient(ellipse at 50% 40%, #17171b 0%, var(--ground) 70%); border: 1px solid var(--hair); border-radius: 4px; padding: clamp(20px, 6vw, 72px); display: grid; place-items: center; min-height: 280px; }
+  .hero canvas { max-width: 100%; height: auto; display: block; }
+  .flats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .flat { border: 1px solid var(--hair); border-radius: 4px; padding: 24px; display: grid; place-items: center; min-height: 150px; }
+  .flat img { max-width: 100%; max-height: 140px; }
+  .flat.light { background: #ecebe8; border-color: #ecebe8; }
+  .flat.red { background: var(--signal); border-color: var(--signal); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .note { color: var(--dim); font-size: 13px; }
+  body.export main { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>HOUSE OF CHAOS</h1>
+      <p>Three chrome logo concepts. Each one comes as a chrome render (transparent PNG) and as flat vector marks for print, merch and stamps.</p>
+    </div>
+    <div class="controls" role="group" aria-label="Chrome finish">
+      <button data-finish="silver" aria-pressed="true">Silver chrome</button>
+      <button data-finish="blood">Red chrome</button>
+    </div>
+  </header>
+
+  <section data-mark="wordmark">
+    <div class="label"><h2>01 · Wordmark</h2><span>HOUSE stays in line, CHAOS falls apart. Both words have five letters, so they stack into a block.</span></div>
+    <div class="hero"><canvas></canvas></div>
+    <div class="flats"></div>
+    <div class="row dl"></div>
+  </section>
+
+  <section data-mark="seal">
+    <div class="label"><h2>02 · Seal</h2><span>Label stamp with an eight-arrow chaos star. Works as a profile picture, vinyl centre label or wristband.</span></div>
+    <div class="hero"><canvas></canvas></div>
+    <div class="flats"></div>
+    <div class="row dl"></div>
+  </section>
+
+  <section data-mark="liquid">
+    <div class="label"><h2>03 · Liquid</h2><span>Melted lowercase "chaos" with drips, the loose and playful side of the brand.</span></div>
+    <div class="hero"><canvas></canvas></div>
+    <div class="flats"></div>
+    <div class="row dl"></div>
+  </section>
+  <p class="note" id="embedNote" hidden>Downloads are blocked in this preview. Open <b>logo/index.html</b> locally to save files, or use the PNGs in <b>logo/export/</b>.</p>
+</main>
+
+<script>
+(() => {
+const params = new URLSearchParams(location.search);
+if (params.get("export") === "1") document.body.classList.add("export");
+const MARKS = ["wordmark", "seal", "liquid"];
+let finish = "silver";
+
+const loadImg = src => new Promise((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = src; });
+const svgCache = {};
+async function svgImage(name){ return svgCache[name] ??= await loadImg(`svg/${name}-white.svg`); }
+
+/* ---- mask: draw the white SVG, alpha channel = shape ---- */
+function canvas(w, h){ const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+function alphaOf(c){ const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; const a = new Float32Array(c.width * c.height); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3] / 255; return a; }
+function blurred(c, r){ const b = canvas(c.width, c.height), x = b.getContext("2d"); x.filter = `blur(${r}px)`; x.drawImage(c, 0, 0); return alphaOf(b); }
+
+/* melt for the liquid mark: drips from the lowest edge of letters, then blur + threshold (goo) */
+function melt(c){
+  const w = c.width, h = c.height, x = c.getContext("2d"), a = alphaOf(c), s = w / 2400;
+  const drips = [[.07, 120], [.19, 60], [.33, 190], [.47, 90], [.6, 150], [.74, 70], [.87, 230], [.95, 110]];
+  x.fillStyle = "#fff";
+  for (const [fx, len] of drips){
+    const px = Math.round(fx * w); let py = -1;
+    for (let y = h - 1; y >= 0; y--) if (a[y * w + px] > .5){ py = y; break; }
+    if (py < 0) continue;
+    const L = len * s, r = (10 + len / 14) * s;
+    x.beginPath(); x.moveTo(px - r * 1.8, py - 6 * s); x.quadraticCurveTo(px - r * .8, py + L * .3, px - r * .55, py + L);
+    x.lineTo(px + r * .55, py + L); x.quadraticCurveTo(px + r * .8, py + L * .3, px + r * 1.8, py - 6 * s); x.fill();
+    x.beginPath(); x.arc(px, py + L, r * 1.05, 0, Math.PI * 2); x.fill();
+  }
+  const b = canvas(w, h), bx = b.getContext("2d"); bx.filter = `blur(${Math.round(16 * s)}px)`; bx.drawImage(c, 0, 0);
+  const img = bx.getImageData(0, 0, w, h), d = img.data;
+  for (let i = 3; i < d.length; i += 4){ const v = (d[i] / 255 - .4) / .2; d[i] = 255 * Math.min(1, Math.max(0, v)); d[i - 3] = d[i - 2] = d[i - 1] = 255; }
+  x.clearRect(0, 0, w, h); x.putImageData(img, 0, 0);
+}
+
+/* ---- chrome shading ---- */
+const FINISH = {
+  silver: { sky: [[0, [255, 255, 255]], [.4, [214, 224, 238]], [1, [104, 120, 146]]], line: [8, 9, 12], ground: [[0, [22, 22, 26]], [.3, [88, 86, 92]], [.65, [190, 192, 198]], [1, [252, 252, 255]]], spec: [255, 255, 255] },
+  blood:  { sky: [[0, [255, 236, 232]], [.55, [226, 120, 112]], [1, [150, 22, 26]]], line: [30, 4, 6], ground: [[0, [70, 6, 10]], [.35, [168, 20, 26]], [.7, [240, 120, 104]], [1, [255, 236, 228]]], spec: [255, 244, 240] },
+};
+function ramp(stops, t){
+  t = Math.min(1, Math.max(0, t));
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]){
+    const [t0, c0] = stops[i - 1], [t1, c1] = stops[i], k = (t - t0) / (t1 - t0);
+    return [c0[0] + (c1[0] - c0[0]) * k, c0[1] + (c1[1] - c0[1]) * k, c0[2] + (c1[2] - c0[2]) * k];
+  }
+  return stops[stops.length - 1][1];
+}
+function chrome(mask, fin, bevel){
+  const w = mask.width, h = mask.height, A = alphaOf(mask);
+  const b1 = blurred(mask, bevel), b2 = blurred(mask, bevel * 3.2);
+  const H = new Float32Array(w * h); for (let i = 0; i < H.length; i++) H[i] = (b1[i] * .7 + b2[i] * .3) * A[i] + A[i] * .02;
+  const out = canvas(w, h), ox = out.getContext("2d"), img = ox.createImageData(w, h), d = img.data;
+  const k = bevel * 1.25, F = FINISH[fin];
+  /* each horizontal run of rows that contains ink gets its own horizon, so every line of text reads as chrome */
+  const band = new Float32Array(h), rows = [];
+  for (let y = 0; y < h; y++){ let any = false; for (let x = 0; x < w; x += 2) if (A[y * w + x] > .02){ any = true; break; } rows.push(any); }
+  for (let y = 0; y < h;){ if (!rows[y]){ y++; continue; } let e = y; while (e < h && (rows[e] || (e + 3 < h && rows[e + 3]))) e++;
+    for (let j = y; j < e; j++) band[j] = (j - y) / Math.max(1, e - y); y = e; }
+  const L = [-.45, -.7, .55], Ln = Math.hypot(...L);
+  const st = Math.max(1, Math.round(bevel / 4)), kk = k / st; /* wider stencil hides 8-bit blur steps */
+  for (let y = st; y < h - st; y++) for (let x = st; x < w - st; x++){
+    const i = y * w + x, a = A[i]; if (a <= 0) continue;
+    let nx = (H[i - st] - H[i + st]) * kk, ny = (H[i - w * st] - H[i + w * st]) * kk, nz = 1;
+    const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
+    const rx = 2 * nz * nx, ry = 2 * nz * ny;
+    /* environment: vertical position on the face + reflected direction */
+    const e = (band[y] - .52) * 1.1 - ry * .85 + rx * .12 + .04 * Math.sin(x / w * 9 + ry * 3);
+    let c;
+    if (e < 0) c = ramp(F.sky, -e / .9);
+    else if (e < .045){ const m = Math.min(e / .012, 1) * (1 - Math.max(0, (e - .03) / .015)); c = F.line.map((v, j) => v * m + ramp(F.ground, 0)[j] * (1 - m)); }
+    else c = ramp(F.ground, (e - .045) / .7);
+    const sp = Math.pow(Math.max(0, (nx * L[0] + ny * L[1] + nz * L[2]) / Ln), 70) * 1.1;
+    const rim = Math.pow(1 - nz, 2) * .5; /* darken the outer bevel slightly */
+    const p = i * 4;
+    d[p] = Math.min(255, c[0] * (1 - rim) + F.spec[0] * sp); d[p + 1] = Math.min(255, c[1] * (1 - rim) + F.spec[1] * sp); d[p + 2] = Math.min(255, c[2] * (1 - rim) + F.spec[2] * sp);
+    d[p + 3] = a * 255;
+  }
+  ox.putImageData(img, 0, 0);
+  return out;
+}
+
+async function renderMark(name, width, fin = finish){
+  const img = await svgImage(name);
+  const h = Math.round(width * img.naturalHeight / img.naturalWidth);
+  const m = canvas(width, h); m.getContext("2d").drawImage(img, 0, 0, width, h);
+  if (name === "liquid"){
+    const split = Math.round(h * .3), keep = canvas(width, split); keep.getContext("2d").drawImage(m, 0, 0);
+    melt(m); const mx = m.getContext("2d"); mx.clearRect(0, 0, width, split); mx.drawImage(keep, 0, 0);
+  }
+  const bevel = Math.max(2, Math.round(width * (name === "liquid" ? .009 : name === "seal" ? .006 : .0045)));
+  return chrome(m, fin, bevel);
+}
+
+/* ---- page ---- */
+let embedded = false; try { embedded = window.self !== window.top; } catch (e) { embedded = true; }
+function save(blob, name){ const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); }
+async function drawAll(){
+  for (const name of MARKS){
+    const sec = document.querySelector(`[data-mark="${name}"]`), cv = sec.querySelector(".hero canvas");
+    const r = await renderMark(name, name === "seal" ? 900 : 1400);
+    cv.width = r.width; cv.height = r.height; cv.style.width = (name === "seal" ? 520 : 900) + "px";
+    cv.getContext("2d").drawImage(r, 0, 0);
+  }
+}
+for (const name of MARKS){
+  const sec = document.querySelector(`[data-mark="${name}"]`);
+  sec.querySelector(".flats").innerHTML =
+    `<div class="flat"><img src="svg/${name}-white.svg" alt="${name} logo, white"></div>` +
+    `<div class="flat light"><img src="svg/${name}-black.svg" alt="${name} logo, black"></div>` +
+    `<div class="flat red"><img src="svg/${name}-black.svg" alt="${name} logo, black on red"></div>`;
+  if (!embedded){
+    const dl = sec.querySelector(".dl");
+    const b1 = document.createElement("button"); b1.textContent = "Download chrome PNG";
+    b1.onclick = async () => (await renderMark(name, name === "seal" ? 2000 : 3000)).toBlob(b => save(b, `house-of-chaos-${name}-${finish}.png`));
+    const b2 = document.createElement("button"); b2.textContent = "Download SVG";
+    b2.onclick = async () => save(await (await fetch(`svg/${name}-white.svg`)).blob(), `house-of-chaos-${name}.svg`);
+    dl.append(b1, b2);
+  }
+}
+if (embedded) document.getElementById("embedNote").hidden = false;
+document.querySelectorAll("[data-finish]").forEach(b => b.onclick = () => {
+  finish = b.dataset.finish; document.querySelectorAll("[data-finish]").forEach(x => x.setAttribute("aria-pressed", x === b)); drawAll();
+});
+window.__render = async (name, width, fin) => (await renderMark(name, width, fin)).toDataURL("image/png");
+window.__ready = document.fonts.load("900 20px ArchX").then(() => params.get("export") === "1" ? null : drawAll());
+})();
+</script>
+</body>
+</html>
